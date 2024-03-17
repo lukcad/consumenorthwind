@@ -1,0 +1,79 @@
+_schema-version: "3.1"
+ID: consumenorthwind
+description: A simple CAP project.
+version: 1.0.0
+modules:
+- name: consumenorthwind-srv
+  type: nodejs
+  path: gen/srv
+  requires:
+  - name: consumenorthwind-destination
+  - name: consumenorthwind-db
+  - name: consumenorthwind-auth
+  provides:
+  - name: srv-api
+    properties:
+      srv-url: ${default-url}
+  parameters:
+    buildpack: nodejs_buildpack
+  build-parameters:
+    builder: npm
+- name: consumenorthwind-db-deployer
+  type: hdb
+  path: gen/db
+  requires:
+  - name: consumenorthwind-db
+  parameters:
+    buildpack: nodejs_buildpack
+- name: consumenorthwind-destination-content
+  type: com.sap.application.content
+  requires:
+  - name: consumenorthwind-destination-service
+    parameters:
+      content-target: true
+  - name: consumenorthwind-auth
+    parameters:
+      service-key:
+        name: consumenorthwind-auth-key
+  parameters:
+    content:
+      instance:
+        destinations:
+        - Authentication: OAuth2UserTokenExchange
+          Name: consumenorthwindmapprouter_consumenorthwind_auth
+          ServiceInstanceName: consumenorthwind-auth
+          ServiceKeyName: consumenorthwind-auth-key
+          sap.cloud.service: consumenorthwindmapprouter
+        existing_destinations_policy: ignore
+  build-parameters:
+    no-source: true
+resources:
+- name: consumenorthwind-destination-service
+  
+- name: consumenorthwind-destination
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: destination
+    service-plan: lite
+- name: consumenorthwind-db
+  type: com.sap.xs.hdi-container
+  parameters:
+    service: hana
+    service-plan: hdi-shared
+- name: consumenorthwind-auth
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      tenant-mode: dedicated
+      xsappname: consumenorthwind-${org}-${space}
+    path: ./xs-security.json
+    service: xsuaa
+    service-plan: application
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+  - builder: custom
+    commands:
+    - npm ci
+    - npx cds build --production
